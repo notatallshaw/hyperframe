@@ -112,6 +112,24 @@ class TestGeneralFrameBehaviour:
         with pytest.raises(InvalidFrameError):
             Frame.parse_frame_header(b'\x00\x00\x08\x00\x01\x00\x00\x00')
 
+    @pytest.mark.parametrize('frame_type', [DataFrame, HeadersFrame])
+    def test_zero_length_padding_serializes_length_field(self, frame_type):
+        f = frame_type(1, b'abc', flags=['PADDED'], pad_length=0)
+
+        assert f.serialize()[9:] == b'\x00abc'
+
+    @pytest.mark.parametrize('frame_type', [DataFrame, HeadersFrame])
+    def test_bytes_subclass_serializes_buffer_length(self, frame_type):
+        class BytesWithCustomLength(bytes):
+            def __len__(self) -> int:
+                return 0
+
+        wire = frame_type(1, BytesWithCustomLength(b'abc')).serialize()
+        _, length = Frame.parse_frame_header(wire[:9])
+
+        assert length == 3
+        assert wire[9:] == b'abc'
+
 
 class TestDataFrame:
     payload = b'\x00\x00\x08\x00\x01\x00\x00\x00\x01testdata'

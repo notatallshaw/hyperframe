@@ -38,6 +38,9 @@ _STRUCT_L = struct.Struct(">L")
 _STRUCT_H = struct.Struct(">H")
 _STRUCT_B = struct.Struct(">B")
 
+# Use one object for absent fields so serializers can check by identity.
+_EMPTY_BYTES = b""
+
 
 class Frame:
     """
@@ -209,7 +212,7 @@ class Padding:
     def serialize_padding_data(self) -> bytes:
         if "PADDED" in self.flags:  # type: ignore
             return _STRUCT_B.pack(self.pad_length)
-        return b""
+        return _EMPTY_BYTES
 
     def parse_padding_data(self, data: memoryview) -> int:
         if "PADDED" in self.flags:  # type: ignore
@@ -305,7 +308,7 @@ class DataFrame(Padding, Frame):
         if isinstance(self.data, memoryview):
             self.data = self.data.tobytes()
 
-        if type(self.data) is bytes and type(padding_data) is bytes and not padding_data and not padding:
+        if type(self.data) is bytes and padding_data is _EMPTY_BYTES and not padding:
             return self.data
 
         return b"".join([padding_data, self.data, padding])
@@ -750,14 +753,12 @@ class HeadersFrame(Padding, Priority, Frame):
         if "PRIORITY" in self.flags:
             priority_data = self.serialize_priority_data()
         else:
-            priority_data = b""
+            priority_data = _EMPTY_BYTES
 
         if (
             type(self.data) is bytes
-            and type(padding_data) is bytes
-            and not padding_data
-            and type(priority_data) is bytes
-            and not priority_data
+            and padding_data is _EMPTY_BYTES
+            and priority_data is _EMPTY_BYTES
             and not padding
         ):
             return self.data
